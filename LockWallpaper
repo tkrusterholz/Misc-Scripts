@@ -1,0 +1,10 @@
+### Tom Rusterholz 2022-05-24
+### Set user account registry to prevent user from changing their wallpaper.
+### You must 1.) Log in as the admin user 2.) Run PowerShell as admin 3.) Copy & paste all below commands into the elevated PS session
+
+$Registry = "Registry::HKEY_USERS\w9guest\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\ActiveDesktop"  # set variable for registry path
+# $Credential = Get-Credential  
+
+reg load HKU\w9guest C:\Users\w9guest\ntuser.dat  # load guest user registry profile
+if (-not (Test-Path $Registry)) { New-Item -Path $Registry -Force | Out-Null }  # create ActiveDesktop item if it does not exist
+New-ItemProperty -Path $Registry -Name NoChangingWallPaper -Value 1 -PropertyType DWORD -Force | Out-Null  # enable value to block changing wallpaper
