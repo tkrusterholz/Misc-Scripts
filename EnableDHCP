@@ -31,13 +31,13 @@ $Workstations | ForEach-Object -Process {
 
     else {
         
-        Invoke-Command -ComputerName $_ -Credential $Credential -InDisconnectedSession -ScriptBlock {  # running as disconnected session as this action will break IP connectivity
+        Invoke-Command -ComputerName $_ -Credential $Credential -InDisconnectedSession -ScriptBlock {  # run as disconnected as this action will break IP connectivity
             Set-NetIPInterface -InterfaceIndex $using:Index -Dhcp Enabled  # set interface to DHCP based on InterfaceIndex discovered above
             Set-DnsClientServerAddress -InterfaceIndex $using:Index -ResetServerAddresses  # remove static DNS settings
-            ipconfig /release; ipconfig /renew  # get new DHCP lease
+            ipconfig /release; netsh winsock reset catalog; netsh int ip reset reset.log; shutdown /r  # reset DHCP registry and reboot
         }
         
-        Write-Output "`n$_ changed to DHCP."
+        Write-Output "`n$_ changed to DHCP and rebooted."
     }
 
 }
