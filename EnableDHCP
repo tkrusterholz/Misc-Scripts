@@ -1,0 +1,44 @@
+###  Tom Rusterholz  2022-03-03
+###  Remotely enables DHCP on a batch of workstations.  Uses IP address to identify the correct interface to change.
+###  Prereq: Create a .txt file with each workstation hostname on its own line.
+
+$Credential = Get-Credential  # cache admin credentials for duration of script
+$Workstations = Read-Host -Prompt "Path to file with list of hostnames" 
+$Workstations = Get-Content -Path $Workstations.Replace('"',"")  # replace string of filepath with the content of the file, stripping quotation marks from filepath
+$Subnet = Read-Host -Prompt 'Enter address string to match against interface IP.  Example 10.1.XX. '  # String that will be used to identify the interface to be changed
+
+$Workstations | ForEach-Object -Process {
+    
+    if ($(Resolve-DnsName -ErrorAction SilentlyContinue $_) -eq $null) {  # Check for good hostname
+        Write-Output "`nHostname $_ not found!"
+        return
+    }
+    
+    Write-Output "`nHostname: $_`nGetting IP info..."
+
+    $Interface = `  # save interface information in local variable
+    Invoke-Command -ErrorAction Stop -ComputerName $_ -Credential $Credential -ScriptBlock {  # if admin credentials are bad, script will abort
+        Get-NetIPAddress | Where-Object IPAddress -Match $using:Subnet  # identify the desired interface based on matching subnet
+    }
+    
+    $Address = $Interface.IPAddress; $Index = $Interface.InterfaceIndex  # extract IP address and interface index to new variables
+    $Confirm = Read-Host -Prompt "IP Address: $Address`nDoes this look correct? [Y/N]"  # usercheck that the interface IP looks correct
+
+    if ($Confirm -ne 'y' ) { 
+        Write-Output "Interface on $_ not changed!!!"
+        return
+    }
+
+    else {
+        
+        Invoke-Command -ComputerName $_ -Credential $Credential -InDisconnectedSession -ScriptBlock {  # running as disconnected session as this action will break IP connectivity
+            Set-NetIPInterface -InterfaceIndex $using:Index -Dhcp Enabled  # set interface to DHCP based on InterfaceIndex discovered above
+            Set-DnsClientServerAddress -InterfaceIndex $using:Index -ResetServerAddresses  # remove static DNS settings
+            ipconfig /release; ipconfig /renew  # get new DHCP lease
+        }
+        
+        Write-Output "`n$_ changed to DHCP."
+    }
+
+}
+Write-Output "`nScript complete!`n"
